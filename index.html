@@ -434,10 +434,13 @@ async function connectSupabase() {
   try {
     sb = window.supabase.createClient(url, key);
     await ensureTables();
-    localStorage.setItem('youne_sb_url', url);
-    localStorage.setItem('youne_sb_key', key);
-    bootApp();
-  } catch(e) { showErr('Erro ao conectar: ' + e.message); }
+    async function ensureTables() {
+  // Testa a conexão fazendo uma query simples
+  const { error } = await sb.from('youne_gastos').select('id').limit(1);
+  if (error && error.code === '42P01') {
+    // Tabela não existe — orientar usuário
+    showErr('Tabelas não encontradas. Crie-as no Supabase conforme as instruções abaixo.');
+  }
 }
 
 function showErr(msg) {
