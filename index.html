@@ -434,13 +434,10 @@ async function connectSupabase() {
   try {
     sb = window.supabase.createClient(url, key);
     await ensureTables();
-    async function ensureTables() {
-  // Testa a conexão fazendo uma query simples
-  const { error } = await sb.from('youne_gastos').select('id').limit(1);
-  if (error && error.code === '42P01') {
-    // Tabela não existe — orientar usuário
-    showErr('Tabelas não encontradas. Crie-as no Supabase conforme as instruções abaixo.');
-  }
+    localStorage.setItem('youne_sb_url', url);
+    localStorage.setItem('youne_sb_key', key);
+    bootApp();
+  } catch(e) { showErr('Erro ao conectar: ' + e.message); }
 }
 
 function showErr(msg) {
@@ -449,14 +446,9 @@ function showErr(msg) {
 }
 
 async function ensureTables() {
-  const tables = [
-    `CREATE TABLE IF NOT EXISTS youne_gastos (id bigserial primary key, desc text, val numeric, fase text, cat text, data date, created_at timestamptz default now())`,
-    `CREATE TABLE IF NOT EXISTS youne_ganhos (id bigserial primary key, desc text, val numeric, orig text, data date, created_at timestamptz default now())`,
-    `CREATE TABLE IF NOT EXISTS youne_passos (id bigserial primary key, desc text, fase text, prio text, prazo date, done boolean default false, created_at timestamptz default now())`,
-    `CREATE TABLE IF NOT EXISTS youne_prestadores (id bigserial primary key, nome text, srv text, contato text, val numeric default 0, status text, created_at timestamptz default now())`,
-  ];
-  for (const sql of tables) {
-    const { error } = await sb.rpc('exec_sql', { query: sql }).catch(() => ({error: null}));
+  const { error } = await sb.from('youne_gastos').select('id').limit(1);
+  if (error && (error.code === '42P01' || error.message.includes('does not exist'))) {
+    throw new Error('Tabelas não encontradas. Crie-as no Supabase via SQL Editor antes de continuar.');
   }
 }
 
@@ -528,7 +520,7 @@ async function addGasto() {
   const data = document.getElementById('g-data').value;
   if (!desc || !val || val <= 0) { toast('Preencha descrição e valor.','error'); return; }
   loading(true);
-  const {error} = await sb.from('youne_gastos').insert([{desc,val,fase,cat,data}]);
+  const {error} = await sb.from('youne_gastos').insert([{descricao:desc,val,fase,cat,data}]);
   if (error) { toast('Erro ao salvar.','error'); loading(false); return; }
   document.getElementById('g-desc').value = '';
   document.getElementById('g-val').value = '';
@@ -551,7 +543,7 @@ function renderGastos() {
   if (!gastos.length) { body.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
   body.innerHTML = gastos.map(g=>`<tr>
-    <td>${g.desc}</td>
+    <td>${g.descricao}</td>
     <td><span class="badge b-purple">${g.fase}</span></td>
     <td><span class="badge b-gray">${g.cat}</span></td>
     <td style="color:var(--txt2)">${g.data}</td>
@@ -576,7 +568,7 @@ async function addGanho() {
   const data = document.getElementById('rg-data').value;
   if (!desc || !val || val <= 0) { toast('Preencha descrição e valor.','error'); return; }
   loading(true);
-  const {error} = await sb.from('youne_ganhos').insert([{desc,val,orig,data}]);
+  const {error} = await sb.from('youne_ganhos').insert([{descricao:desc,val,orig,data}]);
   if (error) { toast('Erro ao salvar.','error'); loading(false); return; }
   document.getElementById('rg-desc').value = '';
   document.getElementById('rg-val').value = '';
@@ -598,7 +590,7 @@ function renderGanhos() {
   if (!ganhos.length) { body.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
   body.innerHTML = ganhos.map(g=>`<tr>
-    <td>${g.desc}</td>
+    <td>${g.descricao}</td>
     <td><span class="badge b-green">${g.orig}</span></td>
     <td style="color:var(--txt2)">${g.data}</td>
     <td style="color:var(--green);font-weight:500">${fmt(g.val)}</td>
@@ -745,7 +737,7 @@ function renderRecent() {
   if (!all.length) { el.innerHTML='<div class="empty">Nenhuma movimentação ainda.</div>'; return; }
   el.innerHTML=`<table><thead><tr><th>Descrição</th><th>Tipo</th><th>Data</th><th>Valor</th></tr></thead><tbody>`+
     all.map(r=>`<tr>
-      <td>${r.desc}</td>
+      <td>${r.descricao}</td>
       <td><span class="badge ${r.tipo==='ganho'?'b-green':'b-red'}">${r.tipo==='ganho'?'Entrada':'Saída'}</span></td>
       <td style="color:var(--txt2)">${r.data||'—'}</td>
       <td style="color:${r.tipo==='ganho'?'var(--green)':'var(--red)'};font-weight:500">${r.tipo==='ganho'?'+':'-'}${fmt(r.val)}</td>
