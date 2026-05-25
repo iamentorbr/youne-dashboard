@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YOUNE — Gestor de Projetos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display:ital@1&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --v:#7B61FF;--vd:#5B3FF0;--vm:#9B85FF;
+  --bg:#0A0A0F;--s1:#111118;--s2:#18181F;--s3:#22222C;
+  --txt:#F0EEFF;--txt2:#8B8BA0;--txt3:#555568;
+  --border:rgba(123,97,255,0.12);--border2:rgba(123,97,255,0.25);
+  --green:#22C55E;--red:#EF4444;--amber:#F59E0B;
+  --font:'DM Sans',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:var(--font);min-height:100vh}
+
+/* SETUP SCREEN */
+#setup-screen{
+  position:fixed;inset:0;background:var(--bg);z-index:1000;
+  display:flex;align-items:center;justify-content:center;
+}
+.setup-card{
+  background:var(--s1);border:1px solid var(--border);border-radius:20px;
+  padding:48px;max-width:480px;width:100%;text-align:center;
+}
+.setup-logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:32px}
+.setup-logo-icon{width:40px;height:40px;background:var(--v);border-radius:12px;display:flex;align-items:center;justify-content:center}
+.setup-title{font-size:22px;font-weight:300;margin-bottom:8px}
+.setup-sub{font-size:14px;color:var(--txt2);margin-bottom:32px;line-height:1.6}
+.setup-field{margin-bottom:16px;text-align:left}
+.setup-field label{font-size:12px;color:var(--txt2);display:block;margin-bottom:6px;font-weight:500}
+.setup-field input{
+  width:100%;background:var(--s2);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;color:var(--txt);font-family:var(--font);font-size:14px;outline:none;
+}
+.setup-field input:focus{border-color:var(--v)}
+.setup-btn{
+  width:100%;background:var(--v);color:#fff;border:none;border-radius:100px;
+  padding:14px;font-family:var(--font);font-size:15px;font-weight:500;cursor:pointer;margin-top:8px;
+  transition:background 0.2s;
+}
+.setup-btn:hover{background:var(--vd)}
+.setup-note{font-size:12px;color:var(--txt3);margin-top:16px;line-height:1.6}
+.setup-note a{color:var(--v);text-decoration:none}
+
+/* LAYOUT */
+.app{display:none;min-height:100vh}
+.app.ready{display:flex}
+.sidebar{
+  width:220px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:24px 0;position:sticky;top:0;height:100vh;
+}
+.sidebar-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:1px solid var(--border)}
+.logo-icon{width:32px;height:32px;background:var(--v);border-radius:9px;display:flex;align-items:center;justify-content:center}
+.logo-name{font-size:17px;font-weight:300;letter-spacing:-0.02em}
+.logo-sub{font-size:10px;color:var(--txt3);margin-top:1px}
+nav{padding:16px 12px;flex:1}
+.nav-label{font-size:10px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;color:var(--txt3);padding:0 8px;margin-bottom:6px;margin-top:16px}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;
+  font-size:13px;color:var(--txt2);cursor:pointer;transition:all 0.15s;margin-bottom:2px;
+}
+.nav-item:hover{background:var(--s2);color:var(--txt)}
+.nav-item.active{background:rgba(123,97,255,0.15);color:var(--v)}
+.nav-icon{font-size:16px;width:18px;text-align:center}
+.sidebar-footer{padding:16px 20px;border-top:1px solid var(--border)}
+.sidebar-footer .version{font-size:11px;color:var(--txt3)}
+
+.main{flex:1;overflow-y:auto}
+.topbar{
+  padding:20px 32px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;background:rgba(10,10,15,0.85);backdrop-filter:blur(12px);z-index:10;
+}
+.topbar-title{font-size:18px;font-weight:300}
+.topbar-actions{display:flex;gap:8px;align-items:center}
+.content{padding:28px 32px}
+
+/* CARDS */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.kpi{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:20px}
+.kpi-label{font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px}
+.kpi-val{font-size:24px;font-weight:300;letter-spacing:-0.02em}
+.kpi-sub{font-size:11px;color:var(--txt3);margin-top:4px}
+.kpi.up .kpi-val{color:var(--green)}
+.kpi.down .kpi-val{color:var(--red)}
+.kpi.purple .kpi-val{color:var(--v)}
+
+.card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:500;color:var(--txt2);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.chart-wrap{height:200px;position:relative}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;font-size:11px;font-weight:500;color:var(--txt3);
+   border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.06em}
+td{padding:11px 12px;border-bottom:1px solid rgba(123,97,255,0.06);color:var(--txt);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(123,97,255,0.04)}
+
+/* FORM */
+.form-grid{display:grid;gap:12px;margin-bottom:16px}
+.fg-5{grid-template-columns:2fr 1fr 1fr 1fr 1fr auto}
+.fg-4{grid-template-columns:2fr 1fr 1fr 1fr auto}
+.fg-3{grid-template-columns:2fr 1fr auto}
+.fg-5b{grid-template-columns:2fr 2fr 2fr 1fr 1fr auto}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:11px;color:var(--txt3);font-weight:500;text-transform:uppercase;letter-spacing:0.06em}
+input,select{
+  background:var(--s2);border:1px solid var(--border);border-radius:9px;
+  padding:9px 12px;color:var(--txt);font-family:var(--font);font-size:13px;outline:none;width:100%;
+  transition:border-color 0.2s;
+}
+input:focus,select:focus{border-color:var(--v)}
+select option{background:var(--s2)}
+
+/* BUTTONS */
+.btn{
+  padding:9px 16px;border-radius:9px;font-family:var(--font);font-size:13px;
+  cursor:pointer;border:1px solid var(--border);background:var(--s2);color:var(--txt);
+  transition:all 0.15s;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;
+}
+.btn:hover{background:var(--s3);border-color:var(--border2)}
+.btn-primary{background:var(--v);color:#fff;border-color:var(--v)}
+.btn-primary:hover{background:var(--vd);border-color:var(--vd)}
+.btn-sm{padding:5px 10px;font-size:11px;border-radius:7px}
+.btn-ghost{background:none;border-color:transparent;color:var(--txt3)}
+.btn-ghost:hover{background:var(--s2);color:var(--txt);border-color:var(--border)}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:500}
+.b-purple{background:rgba(123,97,255,0.15);color:var(--vm)}
+.b-green{background:rgba(34,197,94,0.12);color:#4ade80}
+.b-red{background:rgba(239,68,68,0.12);color:#f87171}
+.b-amber{background:rgba(245,158,11,0.12);color:#fbbf24}
+.b-gray{background:var(--s2);color:var(--txt2)}
+.b-blue{background:rgba(59,130,246,0.12);color:#93c5fd}
+
+/* PAGES */
+.page{display:none}.page.active{display:block}
+
+/* STEPS */
+.step-item{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid rgba(123,97,255,0.06)}
+.step-item:last-child{border-bottom:none}
+.step-circle{
+  width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:500;flex-shrink:0;cursor:pointer;transition:all 0.2s;
+}
+.step-circle.todo{background:var(--s2);color:var(--txt2);border:1px solid var(--border)}
+.step-circle.done{background:var(--green);color:#fff;border:1px solid transparent}
+.step-body{flex:1}
+.step-title{font-size:13px;margin-bottom:3px}
+.step-meta{font-size:11px;color:var(--txt3)}
+.phase-header{font-size:10px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;
+              color:var(--v);margin:16px 0 6px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
+/* PROVIDERS */
+.provider-item{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(123,97,255,0.06)}
+.provider-item:last-child{border-bottom:none}
+.avatar{
+  width:36px;height:36px;border-radius:50%;background:rgba(123,97,255,0.2);
+  color:var(--vm);font-size:12px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.provider-name{font-size:13px;font-weight:500}
+.provider-srv{font-size:12px;color:var(--txt2)}
+.provider-contact{font-size:11px;color:var(--txt3)}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px 20px;color:var(--txt3);font-size:13px}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:24px;right:24px;background:var(--s1);border:1px solid var(--border);
+  border-radius:12px;padding:12px 18px;font-size:13px;color:var(--txt);z-index:999;
+  transform:translateY(80px);opacity:0;transition:all 0.3s;pointer-events:none;
+  display:flex;align-items:center;gap:8px;
+}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:rgba(34,197,94,0.3);color:var(--green)}
+.toast.error{border-color:rgba(239,68,68,0.3);color:var(--red)}
+
+/* LOADING */
+.loading{display:inline-block;width:14px;height:14px;border:2px solid var(--border);
+  border-top-color:var(--v);border-radius:50%;animation:spin 0.6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .sidebar{display:none}
+  .kpi-grid{grid-template-columns:1fr 1fr}
+  .two-col{grid-template-columns:1fr}
+  .fg-5,.fg-4,.fg-3,.fg-5b{grid-template-columns:1fr}
+  .content{padding:16px}
+  .topbar{padding:16px}
+}
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-logo">
+      <div class="setup-logo-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M6 5L12 13L18 5" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="13" x2="12" y2="20" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="12" cy="13" r="1.5" fill="white"/>
+        </svg>
+      </div>
+      <div>
+        <div style="font-size:20px;font-weight:300;letter-spacing:-0.02em">youne</div>
+        <div style="font-size:11px;color:var(--txt3)">Gestor de Projetos</div>
+      </div>
+    </div>
+    <h1 class="setup-title">Configurar Supabase</h1>
+    <p class="setup-sub">Conecte seu banco de dados Supabase para salvar todos os dados do projeto na nuvem, acessíveis de qualquer dispositivo.</p>
+    <div class="setup-field">
+      <label>Supabase URL</label>
+      <input id="sb-url" placeholder="https://xxxx.supabase.co" type="url">
+    </div>
+    <div class="setup-field">
+      <label>Supabase Anon Key</label>
+      <input id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." type="password">
+    </div>
+    <button class="setup-btn" onclick="connectSupabase()">Conectar e entrar</button>
+    <p class="setup-note">
+      Não tem Supabase? <a href="https://supabase.com" target="_blank">Crie uma conta gratuita →</a><br>
+      Suas credenciais ficam salvas localmente e nunca são enviadas para terceiros.
+    </p>
+    <div id="setup-err" style="display:none;margin-top:12px;color:var(--red);font-size:12px"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M6 5L12 13L18 5" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="13" x2="12" y2="20" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="12" cy="13" r="1.5" fill="white"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-name">youne</div>
+        <div class="logo-sub">Gestão do projeto</div>
+      </div>
+    </div>
+    <nav>
+      <div class="nav-label">Visão geral</div>
+      <div class="nav-item active" onclick="showPage('dashboard',this)">
+        <span class="nav-icon">◈</span> Dashboard
+      </div>
+      <div class="nav-label">Financeiro</div>
+      <div class="nav-item" onclick="showPage('gastos',this)">
+        <span class="nav-icon">↑</span> Gastos
+      </div>
+      <div class="nav-item" onclick="showPage('ganhos',this)">
+        <span class="nav-icon">↓</span> Ganhos
+      </div>
+      <div class="nav-label">Projeto</div>
+      <div class="nav-item" onclick="showPage('passos',this)">
+        <span class="nav-icon">✓</span> Próximos passos
+      </div>
+      <div class="nav-item" onclick="showPage('prestadores',this)">
+        <span class="nav-icon">◎</span> Prestadores
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="version">YOUNE Gestor v1.0</div>
+      <button class="btn btn-ghost btn-sm" onclick="resetConfig()" style="margin-top:8px;width:100%;justify-content:center">Trocar banco de dados</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-actions">
+        <span id="topbar-date" style="font-size:12px;color:var(--txt3)"></span>
+        <div class="loading" id="global-loading" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="kpi-grid" id="kpis">
+          <div class="kpi"><div class="kpi-label">Total gasto</div><div class="kpi-val" style="color:var(--txt2)">—</div></div>
+          <div class="kpi"><div class="kpi-label">Total recebido</div><div class="kpi-val" style="color:var(--txt2)">—</div></div>
+          <div class="kpi"><div class="kpi-label">Saldo</div><div class="kpi-val" style="color:var(--txt2)">—</div></div>
+          <div class="kpi"><div class="kpi-label">Prestadores</div><div class="kpi-val" style="color:var(--txt2)">—</div></div>
+        </div>
+        <div class="two-col">
+          <div class="card"><div class="card-title">Gastos por fase</div><div class="chart-wrap"><canvas id="chartFase"></canvas></div></div>
+          <div class="card"><div class="card-title">Gastos por categoria</div><div class="chart-wrap"><canvas id="chartCat"></canvas></div></div>
+        </div>
+        <div class="card"><div class="card-title">Fluxo de caixa acumulado</div><div class="chart-wrap" style="height:160px"><canvas id="chartFluxo"></canvas></div></div>
+        <div class="card"><div class="card-title">Últimas movimentações</div><div id="recent"></div></div>
+      </div>
+
+      <!-- GASTOS -->
+      <div class="page" id="page-gastos">
+        <div class="card">
+          <div class="card-title">Adicionar gasto</div>
+          <div class="form-grid fg-5">
+            <div class="form-group"><label>Descrição</label><input id="g-desc" placeholder="ex: Domínio youne.com"></div>
+            <div class="form-group"><label>Valor (R$)</label><input id="g-val" type="number" step="0.01" min="0" placeholder="0,00"></div>
+            <div class="form-group"><label>Fase</label>
+              <select id="g-fase">
+                <option>Identidade Visual</option><option>Desenvolvimento</option><option>Marketing</option>
+                <option>Infraestrutura</option><option>Jurídico</option><option>Operacional</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Categoria</label>
+              <select id="g-cat"><option>Fixo</option><option>Variável</option><option>Pontual</option></select>
+            </div>
+            <div class="form-group"><label>Data</label><input id="g-data" type="date"></div>
+            <div class="form-group"><label>&nbsp;</label><button class="btn btn-primary" onclick="addGasto()">+ Adicionar</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Todos os gastos <span id="gastos-total" style="color:var(--red);font-size:13px"></span></div>
+          <table><thead><tr><th>Descrição</th><th>Fase</th><th>Categoria</th><th>Data</th><th>Valor</th><th></th></tr></thead>
+          <tbody id="gastos-body"></tbody></table>
+          <div class="empty" id="gastos-empty" style="display:none">Nenhum gasto registrado ainda.</div>
+        </div>
+      </div>
+
+      <!-- GANHOS -->
+      <div class="page" id="page-ganhos">
+        <div class="card">
+          <div class="card-title">Registrar ganho / entrada</div>
+          <div class="form-grid fg-4">
+            <div class="form-group"><label>Descrição</label><input id="rg-desc" placeholder="ex: Aporte inicial"></div>
+            <div class="form-group"><label>Valor (R$)</label><input id="rg-val" type="number" step="0.01" min="0" placeholder="0,00"></div>
+            <div class="form-group"><label>Origem</label>
+              <select id="rg-orig">
+                <option>Aporte próprio</option><option>Investidor</option><option>Pré-venda</option>
+                <option>Assinatura</option><option>Parceria</option><option>Outro</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Data</label><input id="rg-data" type="date"></div>
+            <div class="form-group"><label>&nbsp;</label><button class="btn btn-primary" onclick="addGanho()">+ Adicionar</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Todas as entradas <span id="ganhos-total" style="color:var(--green);font-size:13px"></span></div>
+          <table><thead><tr><th>Descrição</th><th>Origem</th><th>Data</th><th>Valor</th><th></th></tr></thead>
+          <tbody id="ganhos-body"></tbody></table>
+          <div class="empty" id="ganhos-empty" style="display:none">Nenhuma entrada registrada ainda.</div>
+        </div>
+      </div>
+
+      <!-- PRÓXIMOS PASSOS -->
+      <div class="page" id="page-passos">
+        <div class="card">
+          <div class="card-title">Adicionar tarefa</div>
+          <div class="form-grid fg-4">
+            <div class="form-group"><label>Tarefa</label><input id="p-desc" placeholder="ex: Registrar domínio youne.com"></div>
+            <div class="form-group"><label>Fase</label>
+              <select id="p-fase">
+                <option>Fase 0 — Fundação</option><option>Fase 1 — MVP</option><option>Fase 2 — Privado</option>
+                <option>Fase 3 — Beta</option><option>Fase 4 — Lançamento</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Prioridade</label>
+              <select id="p-prio"><option value="alta">Alta</option><option value="media">Média</option><option value="baixa">Baixa</option></select>
+            </div>
+            <div class="form-group"><label>Prazo</label><input id="p-prazo" type="date"></div>
+            <div class="form-group"><label>&nbsp;</label><button class="btn btn-primary" onclick="addPasso()">+ Adicionar</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Tarefas do projeto <span id="passos-progress" style="color:var(--vm);font-size:12px"></span></div>
+          <div id="passos-list"></div>
+          <div class="empty" id="passos-empty" style="display:none">Nenhuma tarefa ainda.</div>
+        </div>
+      </div>
+
+      <!-- PRESTADORES -->
+      <div class="page" id="page-prestadores">
+        <div class="card">
+          <div class="card-title">Cadastrar prestador de serviço</div>
+          <div class="form-grid fg-5b">
+            <div class="form-group"><label>Nome completo</label><input id="pr-nome" placeholder="Nome do prestador"></div>
+            <div class="form-group"><label>Serviço prestado</label><input id="pr-srv" placeholder="ex: Desenvolvimento Bubble"></div>
+            <div class="form-group"><label>Contato (WhatsApp / e-mail)</label><input id="pr-contato" placeholder="@handle ou email@dominio.com"></div>
+            <div class="form-group"><label>Valor cobrado (R$)</label><input id="pr-val" type="number" step="0.01" min="0" placeholder="0,00"></div>
+            <div class="form-group"><label>Status</label>
+              <select id="pr-status">
+                <option value="ativo">Ativo</option><option value="concluido">Concluído</option><option value="negociando">Negociando</option>
+              </select>
+            </div>
+            <div class="form-group"><label>&nbsp;</label><button class="btn btn-primary" onclick="addPrestador()">+ Adicionar</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Time de prestadores <span id="prestadores-total" style="color:var(--vm);font-size:12px"></span></div>
+          <div id="prestadores-list"></div>
+          <div class="empty" id="prestadores-empty" style="display:none">Nenhum prestador cadastrado ainda.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const fmt = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const today = () => new Date().toISOString().split('T')[0];
+let sb = null, charts = {};
+
+// ── SUPABASE ──
+async function connectSupabase() {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  const errEl = document.getElementById('setup-err');
+  errEl.style.display = 'none';
+  if (!url || !key) { showErr('Preencha os dois campos.'); return; }
+  try {
+    sb = window.supabase.createClient(url, key);
+    await ensureTables();
+    localStorage.setItem('youne_sb_url', url);
+    localStorage.setItem('youne_sb_key', key);
+    bootApp();
+  } catch(e) { showErr('Erro ao conectar: ' + e.message); }
+}
+
+function showErr(msg) {
+  const el = document.getElementById('setup-err');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+async function ensureTables() {
+  const { error } = await sb.from('youne_gastos').select('id').limit(1);
+  if (error && (error.code === '42P01' || error.message.includes('does not exist'))) {
+    throw new Error('Tabelas não encontradas. Crie-as no Supabase via SQL Editor antes de continuar.');
+  }
+}
+
+function resetConfig() {
+  localStorage.removeItem('youne_sb_url');
+  localStorage.removeItem('youne_sb_key');
+  location.reload();
+}
+
+function bootApp() {
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('app').classList.add('ready');
+  document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  setDates();
+  loadAll();
+}
+
+function setDates() {
+  ['g-data','rg-data','p-prazo'].forEach(id => { const el = document.getElementById(id); if(el) el.value = today(); });
+}
+
+// ── NAVIGATION ──
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  el.classList.add('active');
+  const titles = {dashboard:'Dashboard',gastos:'Gastos',ganhos:'Ganhos',passos:'Próximos passos',prestadores:'Prestadores de serviço'};
+  document.getElementById('topbar-title').textContent = titles[id];
+  if (id === 'dashboard') setTimeout(renderCharts, 50);
+}
+
+// ── TOAST ──
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = (type==='success'?'✓ ':type==='error'?'✗ ':'')+msg;
+  el.className = 'toast show '+type;
+  setTimeout(() => el.className = 'toast', 2800);
+}
+
+function loading(show) {
+  document.getElementById('global-loading').style.display = show ? 'inline-block' : 'none';
+}
+
+// ── LOAD ALL ──
+async function loadAll() {
+  loading(true);
+  try {
+    await Promise.all([loadGastos(), loadGanhos(), loadPassos(), loadPrestadores()]);
+    renderCharts();
+  } catch(e) { toast('Erro ao carregar dados.','error'); }
+  loading(false);
+}
+
+// ══ GASTOS ══
+let gastos = [];
+async function loadGastos() {
+  const {data,error} = await sb.from('youne_gastos').select('*').order('data',{ascending:false});
+  if (error) throw error;
+  gastos = data || [];
+  renderGastos(); renderKPIs();
+}
+
+async function addGasto() {
+  const desc = document.getElementById('g-desc').value.trim();
+  const val  = parseFloat(document.getElementById('g-val').value);
+  const fase = document.getElementById('g-fase').value;
+  const cat  = document.getElementById('g-cat').value;
+  const data = document.getElementById('g-data').value;
+  if (!desc || !val || val <= 0) { toast('Preencha descrição e valor.','error'); return; }
+  loading(true);
+  const {error} = await sb.from('youne_gastos').insert([{descricao:desc,val,fase,cat,data}]);
+  if (error) { toast('Erro ao salvar.','error'); loading(false); return; }
+  document.getElementById('g-desc').value = '';
+  document.getElementById('g-val').value = '';
+  toast('Gasto registrado!');
+  await loadGastos(); renderCharts();
+  loading(false);
+}
+
+async function delGasto(id) {
+  loading(true);
+  await sb.from('youne_gastos').delete().eq('id',id);
+  toast('Removido.'); await loadGastos(); renderCharts(); loading(false);
+}
+
+function renderGastos() {
+  const body = document.getElementById('gastos-body');
+  const empty = document.getElementById('gastos-empty');
+  const total = gastos.reduce((s,g)=>s+parseFloat(g.val||0),0);
+  document.getElementById('gastos-total').textContent = gastos.length ? fmt(total) : '';
+  if (!gastos.length) { body.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  body.innerHTML = gastos.map(g=>`<tr>
+    <td>${g.descricao}</td>
+    <td><span class="badge b-purple">${g.fase}</span></td>
+    <td><span class="badge b-gray">${g.cat}</span></td>
+    <td style="color:var(--txt2)">${g.data}</td>
+    <td style="color:var(--red);font-weight:500">${fmt(g.val)}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="delGasto(${g.id})">✕</button></td>
+  </tr>`).join('');
+}
+
+// ══ GANHOS ══
+let ganhos = [];
+async function loadGanhos() {
+  const {data,error} = await sb.from('youne_ganhos').select('*').order('data',{ascending:false});
+  if (error) throw error;
+  ganhos = data || [];
+  renderGanhos(); renderKPIs();
+}
+
+async function addGanho() {
+  const desc = document.getElementById('rg-desc').value.trim();
+  const val  = parseFloat(document.getElementById('rg-val').value);
+  const orig = document.getElementById('rg-orig').value;
+  const data = document.getElementById('rg-data').value;
+  if (!desc || !val || val <= 0) { toast('Preencha descrição e valor.','error'); return; }
+  loading(true);
+  const {error} = await sb.from('youne_ganhos').insert([{descricao:desc,val,orig,data}]);
+  if (error) { toast('Erro ao salvar.','error'); loading(false); return; }
+  document.getElementById('rg-desc').value = '';
+  document.getElementById('rg-val').value = '';
+  toast('Entrada registrada!');
+  await loadGanhos(); renderCharts(); loading(false);
+}
+
+async function delGanho(id) {
+  loading(true);
+  await sb.from('youne_ganhos').delete().eq('id',id);
+  toast('Removido.'); await loadGanhos(); renderCharts(); loading(false);
+}
+
+function renderGanhos() {
+  const body = document.getElementById('ganhos-body');
+  const empty = document.getElementById('ganhos-empty');
+  const total = ganhos.reduce((s,g)=>s+parseFloat(g.val||0),0);
+  document.getElementById('ganhos-total').textContent = ganhos.length ? fmt(total) : '';
+  if (!ganhos.length) { body.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  body.innerHTML = ganhos.map(g=>`<tr>
+    <td>${g.descricao}</td>
+    <td><span class="badge b-green">${g.orig}</span></td>
+    <td style="color:var(--txt2)">${g.data}</td>
+    <td style="color:var(--green);font-weight:500">${fmt(g.val)}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="delGanho(${g.id})">✕</button></td>
+  </tr>`).join('');
+}
+
+// ══ PASSOS ══
+let passos = [];
+async function loadPassos() {
+  const {data,error} = await sb.from('youne_passos').select('*').order('created_at',{ascending:true});
+  if (error) throw error;
+  passos = data || [];
+  renderPassos();
+}
+
+async function addPasso() {
+  const desc  = document.getElementById('p-desc').value.trim();
+  const fase  = document.getElementById('p-fase').value;
+  const prio  = document.getElementById('p-prio').value;
+  const prazo = document.getElementById('p-prazo').value;
+  if (!desc) { toast('Digite a descrição da tarefa.','error'); return; }
+  loading(true);
+  const {error} = await sb.from('youne_passos').insert([{desc,fase,prio,prazo,done:false}]);
+  if (error) { toast('Erro ao salvar.','error'); loading(false); return; }
+  document.getElementById('p-desc').value = '';
+  toast('Tarefa adicionada!'); await loadPassos(); loading(false);
+}
+
+async function togglePasso(id, done) {
+  await sb.from('youne_passos').update({done:!done}).eq('id',id);
+  await loadPassos();
+}
+
+async function delPasso(id) {
+  loading(true);
+  await sb.from('youne_passos').delete().eq('id',id);
+  toast('Removido.'); await loadPassos(); loading(false);
+}
+
+function renderPassos() {
+  const el = document.getElementById('passos-list');
+  const empty = document.getElementById('passos-empty');
+  const done = passos.filter(p=>p.done).length;
+  const total = passos.length;
+  document.getElementById('passos-progress').textContent = total ? `${done}/${total} concluídas` : '';
+  if (!total) { el.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  const fases = [...new Set(passos.map(p=>p.fase))];
+  const prioBadge = p => ({alta:'b-red',media:'b-amber',baixa:'b-gray'}[p]);
+  el.innerHTML = fases.map(fase => {
+    const items = passos.filter(p=>p.fase===fase);
+    return `<div class="phase-header">${fase}</div>` +
+      items.map(p=>`<div class="step-item">
+        <div class="step-circle ${p.done?'done':'todo'}" onclick="togglePasso(${p.id},${p.done})">
+          ${p.done?'✓':''}
+        </div>
+        <div class="step-body">
+          <div class="step-title" style="${p.done?'opacity:0.4;text-decoration:line-through':''}">${p.desc}</div>
+          <div class="step-meta">
+            <span class="badge ${prioBadge(p.prio)}" style="font-size:10px">${p.prio}</span>
+            ${p.prazo ? ' · prazo: '+p.prazo : ''}
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="delPasso(${p.id})">✕</button>
+      </div>`).join('');
+  }).join('');
+}
+
+// ══ PRESTADORES ══
+let prestadores = [];
+async function loadPrestadores() {
+  const {data,error} = await sb.from('youne_prestadores').select('*').order('created_at',{ascending:false});
+  if (error) throw error;
+  prestadores = data || [];
+  renderPrestadores(); renderKPIs();
+}
+
+async function addPrestador() {
+  const nome    = document.getElementById('pr-nome').value.trim();
+  const srv     = document.getElementById('pr-srv').value.trim();
+  const contato = document.getElementById('pr-contato').value.trim();
+  const val     = parseFloat(document.getElementById('pr-val').value) || 0;
+  const status  = document.getElementById('pr-status').value;
+  if (!nome || !srv) { toast('Preencha nome e serviço.','error'); return; }
+  loading(true);
+  const {error} = await sb.from('youne_prestadores').insert([{nome,srv,contato,val,status}]);
+  if (error) { toast('Erro ao salvar.','error'); loading(false); return; }
+  ['pr-nome','pr-srv','pr-contato','pr-val'].forEach(id => document.getElementById(id).value='');
+  toast('Prestador cadastrado!'); await loadPrestadores(); loading(false);
+}
+
+async function delPrestador(id) {
+  loading(true);
+  await sb.from('youne_prestadores').delete().eq('id',id);
+  toast('Removido.'); await loadPrestadores(); loading(false);
+}
+
+function renderPrestadores() {
+  const el = document.getElementById('prestadores-list');
+  const empty = document.getElementById('prestadores-empty');
+  const total = prestadores.reduce((s,p)=>s+parseFloat(p.val||0),0);
+  document.getElementById('prestadores-total').textContent = prestadores.length ? `${prestadores.length} cadastrado(s) · ${fmt(total)} investidos` : '';
+  if (!prestadores.length) { el.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  const stBadge = s => ({ativo:'b-green',concluido:'b-blue',negociando:'b-amber'}[s]);
+  const stLabel = s => ({ativo:'Ativo',concluido:'Concluído',negociando:'Negociando'}[s]);
+  el.innerHTML = prestadores.map(p=>`
+    <div class="provider-item">
+      <div class="avatar">${p.nome.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</div>
+      <div style="flex:1">
+        <div class="provider-name">${p.nome}</div>
+        <div class="provider-srv">${p.srv}</div>
+        ${p.contato?`<div class="provider-contact">${p.contato}</div>`:''}
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:500;font-size:14px;color:var(--v)">${fmt(p.val)}</div>
+        <span class="badge ${stBadge(p.status)}" style="margin-top:4px">${stLabel(p.status)}</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="delPrestador(${p.id})" style="margin-left:8px">✕</button>
+    </div>`).join('');
+}
+
+// ── KPIs ──
+function renderKPIs() {
+  const tg = gastos.reduce((s,g)=>s+parseFloat(g.val||0),0);
+  const tr = ganhos.reduce((s,g)=>s+parseFloat(g.val||0),0);
+  const saldo = tr - tg;
+  const np = prestadores.length;
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi down"><div class="kpi-label">Total gasto</div><div class="kpi-val">${fmt(tg)}</div><div class="kpi-sub">${gastos.length} lançamento(s)</div></div>
+    <div class="kpi up"><div class="kpi-label">Total recebido</div><div class="kpi-val">${fmt(tr)}</div><div class="kpi-sub">${ganhos.length} entrada(s)</div></div>
+    <div class="kpi ${saldo>=0?'up':'down'}"><div class="kpi-label">Saldo atual</div><div class="kpi-val">${fmt(saldo)}</div><div class="kpi-sub">${saldo>=0?'positivo':'negativo'}</div></div>
+    <div class="kpi purple"><div class="kpi-label">Prestadores</div><div class="kpi-val">${np}</div><div class="kpi-sub">${prestadores.filter(p=>p.status==='ativo').length} ativo(s)</div></div>`;
+  renderRecent();
+}
+
+function renderRecent() {
+  const all = [
+    ...gastos.map(g=>({...g,tipo:'gasto'})),
+    ...ganhos.map(g=>({...g,tipo:'ganho'}))
+  ].sort((a,b)=>(b.data||'').localeCompare(a.data||'')).slice(0,6);
+  const el = document.getElementById('recent');
+  if (!all.length) { el.innerHTML='<div class="empty">Nenhuma movimentação ainda.</div>'; return; }
+  el.innerHTML=`<table><thead><tr><th>Descrição</th><th>Tipo</th><th>Data</th><th>Valor</th></tr></thead><tbody>`+
+    all.map(r=>`<tr>
+      <td>${r.descricao}</td>
+      <td><span class="badge ${r.tipo==='ganho'?'b-green':'b-red'}">${r.tipo==='ganho'?'Entrada':'Saída'}</span></td>
+      <td style="color:var(--txt2)">${r.data||'—'}</td>
+      <td style="color:${r.tipo==='ganho'?'var(--green)':'var(--red)'};font-weight:500">${r.tipo==='ganho'?'+':'-'}${fmt(r.val)}</td>
+    </tr>`).join('')+`</tbody></table>`;
+}
+
+// ── CHARTS ──
+function renderCharts() {
+  renderKPIs();
+  const txtColor = 'rgba(139,139,160,0.8)';
+  const gridColor = 'rgba(123,97,255,0.06)';
+  const COLORS = ['#7B61FF','#5B3FF0','#9B85FF','#C4B5FD','#4C1D95','#A78BFA'];
+
+  if (charts.fase) charts.fase.destroy();
+  const faseTotals = {};
+  gastos.forEach(g=>{ faseTotals[g.fase]=(faseTotals[g.fase]||0)+parseFloat(g.val||0); });
+  const fL = Object.keys(faseTotals);
+  charts.fase = new Chart(document.getElementById('chartFase'),{
+    type:'doughnut',
+    data:{labels:fL.length?fL:['Sem dados'],datasets:[{data:fL.length?Object.values(faseTotals):[1],backgroundColor:COLORS,borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{labels:{color:txtColor,font:{size:11},boxWidth:10,padding:10}},tooltip:{callbacks:{label:ctx=>' '+fmt(ctx.raw)}}}}
+  });
+
+  if (charts.cat) charts.cat.destroy();
+  const catTotals = {};
+  gastos.forEach(g=>{ catTotals[g.cat]=(catTotals[g.cat]||0)+parseFloat(g.val||0); });
+  const cL = Object.keys(catTotals);
+  charts.cat = new Chart(document.getElementById('chartCat'),{
+    type:'bar',
+    data:{labels:cL.length?cL:['Sem dados'],datasets:[{data:cL.length?Object.values(catTotals):[0],backgroundColor:COLORS,borderRadius:8,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+fmt(ctx.raw)}}},scales:{y:{ticks:{color:txtColor,callback:v=>'R$'+Number(v).toLocaleString('pt-BR')},grid:{color:gridColor}},x:{ticks:{color:txtColor},grid:{display:false}}}}
+  });
+
+  if (charts.fluxo) charts.fluxo.destroy();
+  const allMov = [...gastos.map(g=>({data:g.data,val:-parseFloat(g.val||0)})),...ganhos.map(g=>({data:g.data,val:parseFloat(g.val||0)}))]
+    .filter(m=>m.data).sort((a,b)=>a.data.localeCompare(b.data));
+  let acc=0;
+  const fxL=allMov.map(m=>m.data);
+  const fxD=allMov.map(m=>{ acc+=m.val; return Math.round(acc*100)/100; });
+  charts.fluxo = new Chart(document.getElementById('chartFluxo'),{
+    type:'line',
+    data:{labels:fxL.length?fxL:['Início'],datasets:[{data:fxL.length?fxD:[0],borderColor:'#7B61FF',backgroundColor:'rgba(123,97,255,0.08)',tension:0.4,fill:true,pointRadius:3,pointBackgroundColor:'#7B61FF',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+fmt(ctx.raw)}}},scales:{y:{ticks:{color:txtColor,callback:v=>'R$'+Number(v).toLocaleString('pt-BR')},grid:{color:gridColor}},x:{ticks:{color:txtColor},grid:{display:false}}}}
+  });
+}
+
+// ── INIT ──
+(function init() {
+  const url = localStorage.getItem('youne_sb_url');
+  const key = localStorage.getItem('youne_sb_key');
+  if (url && key) {
+    document.getElementById('sb-url').value = url;
+    document.getElementById('sb-key').value = key;
+    sb = window.supabase.createClient(url, key);
+    bootApp();
+  }
+  setDates();
+})();
+</script>
+</body>
+</html>
